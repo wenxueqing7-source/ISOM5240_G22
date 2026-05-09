@@ -1,5 +1,8 @@
 
 
+
+
+  
 # Program title: Storytelling App
 
 import streamlit as st
@@ -18,8 +21,7 @@ def img2text(image_path):
         )
 
     result = st.session_state.img_model(image_path)
-    scenario = result[0]["generated_text"]
-    return scenario
+    return result[0]["generated_text"]
 
 
 # Function 2: Text to Story
@@ -27,53 +29,55 @@ def text2story(scenario):
     if "story_model" not in st.session_state:
         st.session_state.story_model = pipeline(
             "text-generation",
-            model="roneneldan/TinyStories-Instruct-33M"
+            model="HuggingFaceTB/SmolLM2-360M-Instruct"
         )
+
+    prompt = f"""
+You are a children's storyteller.
+
+Image description:
+{scenario}
+
+Write one short story for children aged 3 to 11.
+
+Rules:
+- The story must be based on the image description.
+- Do not add unrelated topics.
+- Do not add marriage, war, crime, death, weapons, or scary events.
+- Do not write a summary.
+- Do not mention "Summary".
+- Use simple English.
+- Make the story warm, gentle, and positive.
+- The story should feel like a real bedtime story.
+- Around 100 words.
+
+Story:
+"""
 
     forbidden_words = [
         "murder", "kill", "blood", "gun", "knife", "weapon",
         "gangster", "crime", "death", "dead", "horror",
-        "scary", "violence", "violent"
+        "scary", "violence", "violent", "war", "marriage"
     ]
 
-    # Force the story to start from the image description
-    story_start = f"One day, a child saw {scenario}. "
-
-    prompt = f"""
-Write a short story for a young child.
-
-The story must be based on this picture:
-{scenario}
-
-Important:
-- The story must stay consistent with the picture.
-- The main character or object must come from the picture description.
-- Do not add unrelated things.
-- No violence, no death, no weapons, no scary content.
-- Use simple words.
-- Make it warm, happy, and positive.
-- About 100 words.
-
-Start the story exactly like this:
-{story_start}
-"""
-
-    for i in range(3):
+    for attempt in range(3):
         result = st.session_state.story_model(
             prompt,
-            max_new_tokens=120,
+            max_new_tokens=160,
             do_sample=True,
-            temperature=0.6,
+            temperature=0.55,
             top_p=0.85,
-            repetition_penalty=1.4,
+            repetition_penalty=1.25,
             no_repeat_ngram_size=3,
             return_full_text=False
         )
 
-        generated_part = result[0]["generated_text"].strip()
+        story = result[0]["generated_text"].strip()
 
-        story = story_start + generated_part
-        story = re.sub(r"\s+", " ", story).strip()
+        # Remove unwanted extra sections
+        story = story.split("Summary:")[0].strip()
+        story = story.split("Image description:")[0].strip()
+        story = story.split("Rules:")[0].strip()
 
         story_lower = story.lower()
 
@@ -83,7 +87,7 @@ Start the story exactly like this:
                 unsafe = True
                 break
 
-        if not unsafe and len(story.split()) > 40:
+        if not unsafe and len(story.split()) >= 50:
             return story
 
     return None
