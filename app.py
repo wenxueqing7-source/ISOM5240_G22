@@ -1,6 +1,6 @@
 
 
-  # Program title: Storytelling App
+# Program title: Storytelling App
 
 import streamlit as st
 from transformers import pipeline
@@ -30,54 +30,60 @@ def text2story(scenario):
             model="roneneldan/TinyStories-Instruct-33M"
         )
 
-    prompt = f"""
-Write a short story for a young child.
-
-The story is inspired by this picture: {scenario}
-
-Rules:
-- Suitable for children aged 3 to 11.
-- No violence.
-- No death.
-- No weapons.
-- No scary content.
-- Use simple words.
-- Make the story warm, happy, and positive.
-- The story should be about kindness, friendship, curiosity, or imagination.
-
-Story:
-"""
-
     forbidden_words = [
         "murder", "kill", "blood", "gun", "knife", "weapon",
         "gangster", "crime", "death", "dead", "horror",
         "scary", "violence", "violent"
     ]
 
-    # Try to generate a safe story up to 3 times
+    # Force the story to start from the image description
+    story_start = f"One day, a child saw {scenario}. "
+
+    prompt = f"""
+Write a short story for a young child.
+
+The story must be based on this picture:
+{scenario}
+
+Important:
+- The story must stay consistent with the picture.
+- The main character or object must come from the picture description.
+- Do not add unrelated things.
+- No violence, no death, no weapons, no scary content.
+- Use simple words.
+- Make it warm, happy, and positive.
+- About 100 words.
+
+Start the story exactly like this:
+{story_start}
+"""
+
     for i in range(3):
         result = st.session_state.story_model(
             prompt,
-            max_new_tokens=140,
+            max_new_tokens=120,
             do_sample=True,
-            temperature=0.8,
-            top_p=0.9,
-            repetition_penalty=1.3,
+            temperature=0.6,
+            top_p=0.85,
+            repetition_penalty=1.4,
             no_repeat_ngram_size=3,
             return_full_text=False
         )
 
-        story = result[0]["generated_text"].strip()
+        generated_part = result[0]["generated_text"].strip()
+
+        story = story_start + generated_part
+        story = re.sub(r"\s+", " ", story).strip()
 
         story_lower = story.lower()
-        unsafe = False
 
+        unsafe = False
         for word in forbidden_words:
             if re.search(r"\b" + word + r"\b", story_lower):
                 unsafe = True
                 break
 
-        if not unsafe:
+        if not unsafe and len(story.split()) > 40:
             return story
 
     return None
@@ -121,20 +127,18 @@ def main():
 
         if st.button("Generate Story and Audio"):
 
-            # Stage 1: Image to Text
             with st.spinner("Reading the image..."):
                 scenario = img2text(image_path)
 
             st.subheader("Image Description")
             st.write(scenario)
 
-            # Stage 2: Text to Story
             with st.spinner("Generating story..."):
                 story = text2story(scenario)
 
             if story is None:
                 st.warning(
-                    "The app could not generate a safe story this time. "
+                    "The app could not generate a suitable story this time. "
                     "Please try again or upload another image."
                 )
                 st.stop()
@@ -142,7 +146,6 @@ def main():
             st.subheader("Generated Story")
             st.write(story)
 
-            # Stage 3: Story to Audio
             with st.spinner("Generating audio..."):
                 audio_path = story2audio(story)
 
