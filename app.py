@@ -37,7 +37,7 @@ def text2story(scenario):
     Rules:
     No violence, no murder, no weapons, no gangsters, no death, no scary content.
     Use simple, warm, positive language.
-    The story should be about kindness, friendship, curiosity, or imagination.
+    
     Around 100 words.
     """
 
