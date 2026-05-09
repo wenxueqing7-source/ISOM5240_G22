@@ -1,4 +1,8 @@
 streamlit
 transformers<5.0.0
-pillow
 torch
+torchvision
+pillow
+sentencepiece
+scipy
+numpy
