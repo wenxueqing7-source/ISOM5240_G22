@@ -1,3 +1,4 @@
+
 # Program title: Storytelling App
 
 import streamlit as st
@@ -38,19 +39,29 @@ def load_audio_model():
 # Safety filter
 # -----------------------------
 FORBIDDEN_WORDS = [
-    "murder", "kill", "killed", "killer", "blood", "bloody",
-    "gun", "knife", "weapon", "gangster", "crime", "criminal",
-    "death", "dead", "drug", "alcohol", "horror", "scary",
-    "terror", "violence", "violent", "suicide"
+    "murder", "kill", "killed", "killer",
+    "blood", "bloody",
+    "gun", "guns",
+    "knife", "knives",
+    "weapon", "weapons",
+    "gangster", "gang",
+    "crime", "criminal", "robber",
+    "death", "dead", "die", "died",
+    "drug", "drugs", "alcohol",
+    "horror", "scary", "terror",
+    "violence", "violent",
+    "suicide", "abuse",
+    "fight", "fighting",
+    "war", "monster"
 ]
 
 
-def is_safe(text):
-    text = text.lower()
+def keyword_safe(text):
+    text_lower = text.lower()
 
     for word in FORBIDDEN_WORDS:
         pattern = r"\b" + re.escape(word) + r"\b"
-        if re.search(pattern, text):
+        if re.search(pattern, text_lower):
             return False
 
     return True
@@ -67,67 +78,72 @@ def img2text(image_path):
 
 
 # -----------------------------
+# Build prompt
+# -----------------------------
+def build_story_prompt(scenario, attempt):
+    prompt = f"""
+You are writing a story for children aged 3 to 11.
+
+Image description:
+{scenario}
+
+Task:
+Write a short, gentle, child-friendly bedtime story inspired by the image.
+
+Very important rules:
+- The story must be safe for young children.
+- Do not include violence.
+- Do not include murder.
+- Do not include blood.
+- Do not include weapons.
+- Do not include gangsters.
+- Do not include crime.
+- Do not include death.
+- Do not include horror.
+- Do not include scary scenes.
+- Do not include adult content.
+- Do not include dangerous behavior.
+- If the image description contains unsafe elements, ignore those elements completely.
+- Focus only on safe elements such as colors, animals, nature, friendship, family, school, toys, kindness, curiosity, imagination, and learning.
+- Use simple vocabulary.
+- Make the story warm, positive, educational, and comforting.
+- The story should have a happy ending.
+- Around 100 to 150 words.
+
+Story structure:
+1. Introduce a friendly character.
+2. Describe a peaceful place.
+3. Let the character discover something interesting.
+4. Add a simple lesson about kindness, curiosity, or friendship.
+5. End happily.
+
+Only output the story. Do not explain.
+
+Attempt: {attempt}
+"""
+    return prompt
+
+
+# -----------------------------
 # Generate child-safe story
 # -----------------------------
 def generate_child_story(scenario, max_attempts=5):
     story_model = load_story_model()
 
-    forbidden_words = [
-        "murder", "kill", "killed", "killer", "blood", "bloody",
-        "gun", "knife", "weapon", "gangster", "crime", "criminal",
-        "death", "dead", "drug", "alcohol", "horror", "scary",
-        "terror", "violence", "violent", "suicide"
-    ]
-
-    bad_words_ids = []
-    for word in forbidden_words:
-        ids = story_model.tokenizer(
-            word,
-            add_special_tokens=False
-        ).input_ids
-        if len(ids) > 0:
-            bad_words_ids.append(ids)
-
-    for attempt in range(max_attempts):
-
-        prompt = f"""
-        You are a children's bedtime story writer.
-
-        Write a short story for children aged 3 to 11 based on this image description:
-        {scenario}
-
-        The story must be:
-        - warm
-        - gentle
-        - positive
-        - safe for young children
-        - educational
-        - simple to understand
-
-        The story must NOT include:
-        - violence
-        - death
-        - crime
-        - gangster
-        - weapons
-        - scary scenes
-        - horror
-        - adult content
-
-        Write only the story.
-        Around 100 words.
-        """
+    for attempt in range(1, max_attempts + 1):
+        prompt = build_story_prompt(scenario, attempt)
 
         result = story_model(
             prompt,
-            max_new_tokens=160,
+            max_new_tokens=220,
             do_sample=False,
-            bad_words_ids=bad_words_ids
+            num_beams=5,
+            early_stopping=True
         )
 
         story = result[0]["generated_text"].strip()
 
-        if is_safe(story):
+        if keyword_safe(story):
             return story
 
     return None
@@ -150,7 +166,7 @@ uploaded_file = st.file_uploader(
 
 if uploaded_file is not None:
     try:
-        # Save uploaded image to temporary file
+        # Save uploaded image to a temporary file
         with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp_file:
             tmp_file.write(uploaded_file.getvalue())
             image_path = tmp_file.name
@@ -175,12 +191,22 @@ if uploaded_file is not None:
         if story is None:
             st.warning(
                 "The app could not generate a safe story this time. "
-                "Please try another image or click rerun."
+                "Please try another image."
             )
+            os.remove(image_path)
             st.stop()
 
         st.write("**Story:**")
         st.write(story)
+
+        # Final safety check before audio
+        if not keyword_safe(story):
+            st.warning(
+                "The generated story may not be suitable for children, "
+                "so audio was not generated."
+            )
+            os.remove(image_path)
+            st.stop()
 
         # Stage 3: Story to Audio
         with st.spinner("Generating audio..."):
@@ -192,7 +218,6 @@ if uploaded_file is not None:
             sample_rate=audio_data["sampling_rate"]
         )
 
-        # Remove temporary image file
         os.remove(image_path)
 
     except Exception as e:
