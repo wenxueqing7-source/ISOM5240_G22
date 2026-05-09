@@ -23,7 +23,7 @@ def load_story_model():
     # Lightweight model, more suitable for Streamlit Cloud
     return pipeline(
         "text2text-generation",
-        model="google/flan-t5-small"
+        model="mehuldamani/story-gen_llama-sft-full"
     )
 
 
