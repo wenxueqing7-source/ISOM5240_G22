@@ -1,5 +1,8 @@
 
 
+
+   
+  
 # Program title: Storytelling App
 
 import streamlit as st
@@ -63,33 +66,17 @@ def text2story(scenario):
 
     generated_text = result[0]["generated_text"]
 
-    # For chat-style output
     if isinstance(generated_text, list):
         story = generated_text[-1]["content"]
     else:
         story = generated_text
 
-    # Clean output
     story = story.strip()
     story = story.replace("Story:", "").strip()
     story = story.replace("Title:", "").strip()
     story = story.replace("Summary:", "").strip()
     story = re.sub(r"\s+", " ", story)
 
-    # Remove possible prompt repetition
-    bad_phrases = [
-        "image description:",
-        "write one complete",
-        "do not write",
-        "the story should",
-        "return only"
-    ]
-
-    for phrase in bad_phrases:
-        if phrase in story.lower():
-            story = story.split(phrase)[0].strip()
-
-    # Keep story within 100 words
     words = story.split()
     if len(words) > 100:
         story = " ".join(words[:100])
@@ -99,11 +86,9 @@ def text2story(scenario):
         else:
             story += "."
 
-    # If the model gives an incomplete sentence, add a simple ending
     if story and not story.endswith((".", "!", "?")):
         story += "."
 
-    # Safety check
     forbidden_words = [
         "murder", "kill", "blood", "gun", "knife", "weapon",
         "gangster", "crime", "death", "dead", "horror",
@@ -132,19 +117,129 @@ def story2audio(story):
 # Function 4: Main App
 def main():
     st.set_page_config(
-        page_title="Storytelling App",
-        page_icon="📖"
+        page_title="Magic Storytelling App",
+        page_icon="🌈",
+        layout="centered"
     )
 
-    st.title("Storytelling App")
-    st.write("Upload a picture and create a short audio story for children.")
+    # CSS style
+    st.markdown(
+        """
+        <style>
+        .stApp {
+            background: linear-gradient(135deg, #FFF7D6 0%, #FFE4F3 45%, #DDF3FF 100%);
+        }
+
+        .main-title {
+            text-align: center;
+            font-size: 46px;
+            font-weight: 800;
+            color: #FF7A59;
+            margin-bottom: 5px;
+        }
+
+        .subtitle {
+            text-align: center;
+            font-size: 20px;
+            color: #5D5D5D;
+            margin-bottom: 30px;
+        }
+
+        .step-card {
+            background-color: rgba(255, 255, 255, 0.85);
+            padding: 20px;
+            border-radius: 25px;
+            box-shadow: 0px 6px 18px rgba(0, 0, 0, 0.08);
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .story-card {
+            background-color: #FFFFFF;
+            padding: 25px;
+            border-radius: 25px;
+            box-shadow: 0px 6px 18px rgba(0, 0, 0, 0.10);
+            font-size: 19px;
+            line-height: 1.8;
+            color: #444444;
+            margin-top: 15px;
+        }
+
+        .description-card {
+            background-color: #FFF2CC;
+            padding: 18px;
+            border-radius: 20px;
+            font-size: 17px;
+            color: #555555;
+            margin-top: 10px;
+        }
+
+        .stButton > button {
+            background-color: #FF9F45;
+            color: white;
+            border: none;
+            border-radius: 25px;
+            padding: 14px 28px;
+            font-size: 20px;
+            font-weight: bold;
+            width: 100%;
+        }
+
+        .stButton > button:hover {
+            background-color: #FF7A59;
+            color: white;
+        }
+
+        .stFileUploader {
+            background-color: rgba(255, 255, 255, 0.7);
+            padding: 18px;
+            border-radius: 20px;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+
+    # App title
+    st.markdown(
+        "<div class='main-title'>🌈 Magic Storytelling App 📖</div>",
+        unsafe_allow_html=True
+    )
+
+    st.markdown(
+        "<div class='subtitle'>Upload a picture and turn it into a gentle audio story for children.</div>",
+        unsafe_allow_html=True
+    )
+
+    # Three simple steps
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        st.markdown(
+            "<div class='step-card'>📷<br><b>Step 1</b><br>Upload a picture</div>",
+            unsafe_allow_html=True
+        )
+
+    with col2:
+        st.markdown(
+            "<div class='step-card'>✨<br><b>Step 2</b><br>Create a story</div>",
+            unsafe_allow_html=True
+        )
+
+    with col3:
+        st.markdown(
+            "<div class='step-card'>🔊<br><b>Step 3</b><br>Listen to audio</div>",
+            unsafe_allow_html=True
+        )
 
     uploaded_file = st.file_uploader(
-        "Upload an image",
+        "Choose an image for your story",
         type=["jpg", "jpeg", "png"]
     )
 
     if uploaded_file is not None:
+        st.markdown("### 🖼️ Your Picture")
+
         st.image(
             uploaded_file,
             caption="Uploaded Image",
@@ -155,25 +250,36 @@ def main():
             tmp_file.write(uploaded_file.getvalue())
             image_path = tmp_file.name
 
-        if st.button("Generate Story and Audio"):
+        st.write("")
 
-            with st.spinner("Reading the image..."):
+        if st.button("✨ Create My Story and Audio"):
+
+            with st.spinner("Reading the picture..."):
                 scenario = img2text(image_path)
 
-            st.subheader("Image Description")
-            st.write(scenario)
+            st.markdown("### 🔍 Image Description")
+            st.markdown(
+                f"<div class='description-card'>{scenario}</div>",
+                unsafe_allow_html=True
+            )
 
-            with st.spinner("Generating story..."):
+            with st.spinner("Writing a magical story..."):
                 story = text2story(scenario)
 
-            st.subheader("Generated Story")
-            st.write(story)
+            st.markdown("### 📖 Generated Story")
+            st.markdown(
+                f"<div class='story-card'>{story}</div>",
+                unsafe_allow_html=True
+            )
 
-            with st.spinner("Generating audio..."):
+            with st.spinner("Turning the story into audio..."):
                 audio_path = story2audio(story)
 
-            st.subheader("Audio Story")
+            st.markdown("### 🔊 Audio Story")
             st.audio(audio_path)
+
+            st.success("Your story is ready! Enjoy listening. 🌟")
+            st.balloons()
 
 
 if __name__ == "__main__":
