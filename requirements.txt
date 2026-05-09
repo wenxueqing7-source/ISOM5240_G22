@@ -6,3 +6,4 @@ pillow
 sentencepiece
 scipy
 numpy
+gTTS
