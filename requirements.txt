@@ -4,6 +4,5 @@ torch
 torchvision
 pillow
 sentencepiece
-scipy
-numpy
+accelerate
 gTTS
