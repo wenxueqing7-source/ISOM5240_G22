@@ -20,10 +20,9 @@ def load_img2text_model():
 
 @st.cache_resource
 def load_story_model():
-    # Lightweight model, more suitable for Streamlit Cloud
     return pipeline(
         "text2text-generation",
-        model="Onion-1/story-gpt2-finetuned"
+        model="google/flan-t5-base"
     )
 
 
@@ -73,29 +72,57 @@ def img2text(image_path):
 def generate_child_story(scenario, max_attempts=5):
     story_model = load_story_model()
 
+    forbidden_words = [
+        "murder", "kill", "killed", "killer", "blood", "bloody",
+        "gun", "knife", "weapon", "gangster", "crime", "criminal",
+        "death", "dead", "drug", "alcohol", "horror", "scary",
+        "terror", "violence", "violent", "suicide"
+    ]
+
+    bad_words_ids = []
+    for word in forbidden_words:
+        ids = story_model.tokenizer(
+            word,
+            add_special_tokens=False
+        ).input_ids
+        if len(ids) > 0:
+            bad_words_ids.append(ids)
+
     for attempt in range(max_attempts):
+
         prompt = f"""
-        Write a short, warm, child-friendly bedtime story for children aged 3 to 11.
+        You are a children's bedtime story writer.
 
-        Image description: {scenario}
+        Write a short story for children aged 3 to 11 based on this image description:
+        {scenario}
 
-        Requirements:
-        - The story must be safe for young children.
-        - No violence.
-        - No murder.
-        - No gangster.
-        - No weapons.
-        - No scary horror content.
-        - No death.
-        - No adult content.
+        The story must be:
+        - warm
+        - gentle
+        - positive
+        - safe for young children
+        - educational
+        - simple to understand
+
+        The story must NOT include:
+        - violence
+        - death
+        - crime
+        - gangster
+        - weapons
+        - scary scenes
+        - horror
+        - adult content
+
+        Write only the story.
+        Around 100 words.
         """
 
         result = story_model(
             prompt,
-            max_new_tokens=180,
-            do_sample=True,
-            temperature=0.7,
-            top_p=0.9
+            max_new_tokens=160,
+            do_sample=False,
+            bad_words_ids=bad_words_ids
         )
 
         story = result[0]["generated_text"].strip()
