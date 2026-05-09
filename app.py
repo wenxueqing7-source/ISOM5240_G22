@@ -1,5 +1,4 @@
 
- 
 # Program title: Storytelling App
 
 import streamlit as st
@@ -25,68 +24,75 @@ def img2text(image_path):
 def text2story(scenario):
     if "story_model" not in st.session_state:
         st.session_state.story_model = pipeline(
-            "text2text-generation",
-            model="google/flan-t5-small"
+            "text-generation",
+            model="roneneldan/TinyStories-Instruct-33M"
         )
 
     prompt = f"""
-    Write a short bedtime story for children aged 3 to 11.
+Write a short story for a young child.
 
-    Image description: {scenario}
+The story is inspired by this picture: {scenario}
 
-    Rules:
-    No violence, no murder, no weapons, no gangsters, no death, no scary content.
-    Use simple, warm, positive language.
-    
-    Around 100 words.
-    """
+Rules:
+- Safe for children aged 3 to 11.
+- No violence, no death, no weapons, no scary content.
+- Use simple words.
+- Make it warm, happy, and positive.
+- About friendship, kindness, curiosity, or imagination.
+
+Story:
+"""
 
     result = st.session_state.story_model(
         prompt,
-        max_new_tokens=150,
-        do_sample=False
+        max_new_tokens=120,
+        do_sample=True,
+        temperature=0.7,
+        top_p=0.9,
+        repetition_penalty=1.3,
+        no_repeat_ngram_size=3,
+        return_full_text=False
     )
 
-    story = result[0]["generated_text"]
-    return story
+    story = result[0]["generated_text"].strip()
 
-
-# Function 3: Story to Audio
-def story2audio(story):
-    tts = gTTS(text=story, lang="en")
-    audio_file = tempfile.NamedTemporaryFile(delete=False, suffix=".mp3")
-    tts.save(audio_file.name)
-    return audio_file.name
-
-
-# Simple safety check
-def is_safe(text):
     forbidden_words = [
         "murder", "kill", "blood", "gun", "knife", "weapon",
         "gangster", "crime", "death", "dead", "horror",
         "scary", "violence", "violent"
     ]
 
-    text = text.lower()
+    story_lower = story.lower()
 
     for word in forbidden_words:
-        if re.search(r"\b" + word + r"\b", text):
-            return False
+        if re.search(r"\b" + word + r"\b", story_lower):
+            return None
 
-    return True
+    return story
+
+
+# Function 3: Story to Audio
+def story2audio(story):
+    tts = gTTS(text=story, lang="en")
+
+    audio_file = tempfile.NamedTemporaryFile(delete=False, suffix=".mp3")
+    tts.save(audio_file.name)
+
+    return audio_file.name
 
 
 # Function 4: Main App
 def main():
     st.set_page_config(
         page_title="Storytelling App",
-        page_icon="🦜"
+        page_icon="📖"
     )
 
-    st.header("Turn Your Image into an Audio Story")
+    st.title("Storytelling App")
+    st.write("Upload a picture and create a short audio story for children.")
 
     uploaded_file = st.file_uploader(
-        "Select an Image...",
+        "Upload an image",
         type=["jpg", "jpeg", "png"]
     )
 
@@ -97,28 +103,15 @@ def main():
             tmp_file.write(uploaded_file.getvalue())
             image_path = tmp_file.name
 
-        if st.button("Generate Story and Audio"):
+        if st.button("Generate Story"):
+            with st.spinner("Reading the image..."):
+                scenario = img2text(image_path)
 
-            st.text("Processing image...")
-            scenario = img2text(image_path)
-            st.write("**Scenario:**")
+            st.subheader("Image Description")
             st.write(scenario)
 
-            st.text("Generating story...")
-            story = text2story(scenario)
+            with st.spinner("Writing the story..."):
+                story = text2story(scenario)
 
-            if not is_safe(story):
-                st.warning("The story may not be safe for children. Please try again.")
-                st.stop()
-
-            st.write("**Story:**")
-            st.write(story)
-
-            st.text("Generating audio...")
-            audio_path = story2audio(story)
-
-            st.audio(audio_path)
-
-
-if __name__ == "__main__":
-    main()
+            if story is None:
+                st.warning("The story may not be suitable
