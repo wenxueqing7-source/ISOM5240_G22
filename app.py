@@ -3,7 +3,8 @@
 
 
   
-# Program title: Storytelling App
+
+   # Program title: Storytelling App
 
 import streamlit as st
 from transformers import pipeline
@@ -20,48 +21,63 @@ def img2text(image_path):
             model="Salesforce/blip-image-captioning-base"
         )
 
-    result = st.session_state.img_model(image_path)
-    return result[0]["generated_text"]
+    result = st.session_state.img_model(
+        image_path,
+        max_new_tokens=50
+    )
+
+    caption = result[0]["generated_text"].strip()
+    return caption
 
 
 # Function 2: Text to Story
 def text2story(scenario):
     if "story_model" not in st.session_state:
         st.session_state.story_model = pipeline(
-            "text-generation",
-            model="roneneldan/TinyStories-33M"
+            "text2text-generation",
+            model="google/flan-t5-base"
         )
 
     prompt = f"""
-In the picture, there is {scenario}.
+Write a short children's story based ONLY on this image description:
 
-This is a gentle bedtime story for young children.
-The story is warm, happy, simple, and positive.
-It is about kindness, curiosity, learning, and imagination.
+Image description: {scenario}
+
+Rules:
+- The story must be 50 to 100 words.
+- The story must stay consistent with the image description.
+- Do not add unrelated topics, people, places, or events.
+- Use simple English for children aged 3 to 10.
+- Make the story warm, positive, gentle, and imaginative.
+- Return only the story, no title, no summary.
 
 Story:
 """
 
     result = st.session_state.story_model(
         prompt,
-        max_new_tokens=130,
-        do_sample=True,
-        temperature=0.7,
-        top_p=0.9,
-        repetition_penalty=1.25,
-        no_repeat_ngram_size=3,
-        return_full_text=False
+        max_new_tokens=120,
+        num_beams=4,
+        do_sample=False
     )
 
     story = result[0]["generated_text"].strip()
 
     # Clean output
     story = story.replace("Story:", "").strip()
-    story = story.split("Summary:")[0].strip()
+    story = story.replace("Summary:", "").strip()
     story = re.sub(r"\s+", " ", story)
 
-    # Make the story start with the image, so it stays consistent
-    story = f"In the picture, there is {scenario}. " + story
+    # Make sure the story is connected to the image
+    if scenario.lower() not in story.lower():
+        story = f"In the picture, {scenario}. " + story
+
+    # Limit to around 100 words
+    words = story.split()
+    if len(words) > 100:
+        story = " ".join(words[:100])
+        if not story.endswith("."):
+            story += "."
 
     # Simple safety check
     forbidden_words = [
