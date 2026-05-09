@@ -88,9 +88,6 @@ def generate_child_story(scenario, max_attempts=5):
         - No scary horror content.
         - No death.
         - No adult content.
-        - Use simple and warm language.
-        - Make the story positive, gentle, imaginative, and educational.
-        - The story should be around 100 words.
         """
 
         result = story_model(
