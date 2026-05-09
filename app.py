@@ -29,68 +29,54 @@ def text2story(scenario):
     if "story_model" not in st.session_state:
         st.session_state.story_model = pipeline(
             "text-generation",
-            model="HuggingFaceTB/SmolLM2-360M-Instruct"
+            model="roneneldan/TinyStories-33M"
         )
 
     prompt = f"""
-You are a children's storyteller.
+In the picture, there is {scenario}.
 
-Image description:
-{scenario}
-
-Write one short story for children aged 3 to 11.
-
-Rules:
-- The story must be based on the image description.
-- Do not add unrelated topics.
-- Do not add marriage, war, crime, death, weapons, or scary events.
-- Do not write a summary.
-- Do not mention "Summary".
-- Use simple English.
-- Make the story warm, gentle, and positive.
-- The story should feel like a real bedtime story.
-- Around 100 words.
+This is a gentle bedtime story for young children.
+The story is warm, happy, simple, and positive.
+It is about kindness, curiosity, learning, and imagination.
 
 Story:
 """
 
+    result = st.session_state.story_model(
+        prompt,
+        max_new_tokens=130,
+        do_sample=True,
+        temperature=0.7,
+        top_p=0.9,
+        repetition_penalty=1.25,
+        no_repeat_ngram_size=3,
+        return_full_text=False
+    )
+
+    story = result[0]["generated_text"].strip()
+
+    # Clean output
+    story = story.replace("Story:", "").strip()
+    story = story.split("Summary:")[0].strip()
+    story = re.sub(r"\s+", " ", story)
+
+    # Make the story start with the image, so it stays consistent
+    story = f"In the picture, there is {scenario}. " + story
+
+    # Simple safety check
     forbidden_words = [
         "murder", "kill", "blood", "gun", "knife", "weapon",
         "gangster", "crime", "death", "dead", "horror",
-        "scary", "violence", "violent", "war", "marriage"
+        "violence", "violent", "war"
     ]
 
-    for attempt in range(3):
-        result = st.session_state.story_model(
-            prompt,
-            max_new_tokens=160,
-            do_sample=True,
-            temperature=0.55,
-            top_p=0.85,
-            repetition_penalty=1.25,
-            no_repeat_ngram_size=3,
-            return_full_text=False
-        )
+    story_lower = story.lower()
 
-        story = result[0]["generated_text"].strip()
+    for word in forbidden_words:
+        if re.search(r"\b" + word + r"\b", story_lower):
+            return "The app generated an unsuitable story. Please click the button again or try another image."
 
-        # Remove unwanted extra sections
-        story = story.split("Summary:")[0].strip()
-        story = story.split("Image description:")[0].strip()
-        story = story.split("Rules:")[0].strip()
-
-        story_lower = story.lower()
-
-        unsafe = False
-        for word in forbidden_words:
-            if re.search(r"\b" + word + r"\b", story_lower):
-                unsafe = True
-                break
-
-        if not unsafe and len(story.split()) >= 50:
-            return story
-
-    return None
+    return story
 
 
 # Function 3: Story to Audio
@@ -131,25 +117,21 @@ def main():
 
         if st.button("Generate Story and Audio"):
 
+            # Stage 1: Image to Text
             with st.spinner("Reading the image..."):
                 scenario = img2text(image_path)
 
             st.subheader("Image Description")
             st.write(scenario)
 
+            # Stage 2: Text to Story
             with st.spinner("Generating story..."):
                 story = text2story(scenario)
-
-            if story is None:
-                st.warning(
-                    "The app could not generate a suitable story this time. "
-                    "Please try again or upload another image."
-                )
-                st.stop()
 
             st.subheader("Generated Story")
             st.write(story)
 
+            # Stage 3: Story to Audio
             with st.spinner("Generating audio..."):
                 audio_path = story2audio(story)
 
